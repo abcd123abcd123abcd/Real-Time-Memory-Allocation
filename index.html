@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Real-Time Memory Allocation Tracker</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="theme-toggle-wrapper">
+    <button id="theme-toggle" class="theme-toggle" aria-label="Toggle Dark Mode">
+      <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="5"></circle>
+        <line x1="12" y1="1" x2="12" y2="3"></line>
+        <line x1="12" y1="21" x2="12" y2="23"></line>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+        <line x1="1" y1="12" x2="3" y2="12"></line>
+        <line x1="21" y1="12" x2="23" y2="12"></line>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+      </svg>
+      <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+      </svg>
+    </button>
+  </div>
+  <div class="container">
+    <div class="card">
+      <h1>Memory Allocation Simulator</h1>
+      <div class="tabs">
+        <div class="tab active" data-mode="segmentation" onclick="switchMemoryMode('segmentation')">Segmentation</div>
+        <div class="tab" data-mode="paging" onclick="switchMemoryMode('paging')">Paging</div>
+      </div>
+      <div id="memoryConfig">
+        <h3>Step 1: Configure Memory</h3>
+        <div class="row">
+          <div class="form-row">
+            <label for="totalMemory">Total Memory Size (KB):</label>
+            <input type="number" id="totalMemory" value="1000" min="100" step="50">
+          </div>
+          <div class="form-row" id="segmentationConfig">
+            <label for="pageSize">Block Size (KB):</label>
+            <input type="number" id="pageSize" value="100" min="10" step="10">
+            <p class="help-text">Size of each segment in segmentation mode</p>
+          </div>
+          <div class="form-row" id="pagingConfig" style="display:none;">
+            <label for="pageSize">Page Size (KB):</label>
+            <input type="number" id="pageSize" value="100" min="10" step="10">
+            <p class="help-text">Size of each page in paging mode</p>
+          </div>
+          <button id="configMemory" class="btn btn-primary" onclick="updateMemoryConfiguration()">Configure Memory</button>
+        </div>
+      </div>
+      <div id="processManagement" style="display:none;">
+        <h3>Step 2: Add Processes</h3>
+        <div id="processList"></div>
+        <button onclick="addProcessInput()" class="btn btn-primary">Add Process</button>
+        <div class="form-row">
+          <label for="allocationStrategy">Allocation Strategy:</label>
+          <select id="allocationStrategy">
+            <option value="firstFit">First Fit</option>
+            <option value="bestFit">Best Fit</option>
+            <option value="worstFit">Worst Fit</option>
+          </select>
+        </div>
+        <div class="button-row">
+          <button id="startBtn" class="btn btn-primary" onclick="startSimulation()">Allocate Memory</button>
+          <button id="resetBtn" class="btn btn-danger" onclick="resetSimulation()">Reset</button>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="card">
+        <h2>Memory Visualization</h2>
+        <div class="tabs visualization-tabs">
+          <div class="tab active" data-viz="blocks" onclick="switchVisualization('blocks')">Memory Blocks</div>
+          <div class="tab" data-viz="tables" onclick="switchVisualization('tables')">Memory Tables</div>
+          <div class="tab" data-viz="compare" onclick="switchVisualization('compare')">Compare Modes</div>
+        </div>
+        <div id="blocksVisualization" class="visualization-panel">
+          <div class="chart-wrapper">
+            <canvas id="memoryChart"></canvas>
+          </div>
+          <div class="legend">
+            <div class="legend-item">
+              <div class="color-box free-memory"></div>
+              <span>Free Memory</span>
+            </div>
+            <div class="legend-item">
+              <div class="color-box allocated-memory"></div>
+              <span>Allocated Memory</span>
+            </div>
+          </div>
+        </div>
+        <div id="tablesVisualization" class="visualization-panel" style="display:none;">
+          <div id="segmentTableView">
+            <h3>Segment Table</h3>
+            <div id="segmentTableContainer" class="table-container"></div>
+            <div class="info-box warning-box">
+              <h4>External Fragmentation Issue</h4>
+              <p>Memory becomes fragmented when free spaces are scattered.</p>
+            </div>
+          </div>
+          <div id="pageTableView" style="display:none;">
+            <h3>Page Table</h3>
+            <div id="pageTableContainer" class="table-container"></div>
+            <div class="info-box warning-box">
+              <h4>Internal Fragmentation Issue</h4>
+              <p>Unused space within allocated memory.</p>
+            </div>
+          </div>
+        </div>
+        <div id="compareVisualization" class="visualization-panel" style="display:none;">
+          <div class="comparison-container">
+            <div class="comparison-column">
+              <h3>Segmentation</h3>
+              <div class="comparison-image">
+                <img src="segmentation-diagram.svg" alt="Segmentation illustration">
+              </div>
+              <ul class="comparison-features">
+                <li>Variable-sized memory blocks</li>
+                <li>Requires contiguous allocation</li>
+                <li>Suffers from external fragmentation</li>
+                <li>Maps to program's logical structure</li>
+                <li>May need compaction</li>
+              </ul>
+            </div>
+            <div class="comparison-column">
+              <h3>Paging</h3>
+              <div class="comparison-image">
+                <img src="paging-diagram.svg" alt="Paging illustration">
+              </div>
+              <ul class="comparison-features">
+                <li>Fixed-size memory pages</li>
+                <li>Allows non-contiguous allocation</li>
+                <li>Suffers from internal fragmentation</li>
+                <li>Better overall utilization</li>
+                <li>Independent of program logic</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="card">
+        <h2>Memory Usage Statistics</h2>
+        <div class="stats-card">
+          <div class="stat-box">
+            <div class="stat-title">Total Memory</div>
+            <div class="stat-value"><span id="totalMemoryDisplay">0</span> KB</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-title">Used Memory</div>
+            <div class="stat-value"><span id="usedMemoryDisplay">0</span> KB</div>
+            <div class="stat-subtitle">(<span id="usedMemoryPercentDisplay">0</span>%)</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-title">Free Memory</div>
+            <div class="stat-value"><span id="freeMemoryDisplay">0</span> KB</div>
+            <div class="stat-subtitle">(<span id="freeMemoryPercentDisplay">0</span>%)</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-title">Memory Blocks</div>
+            <div class="stat-value"><span id="totalBlocksDisplay">0</span></div>
+          </div>
+        </div>
+        <div id="pagingInfo" style="display:none;">
+          <div class="info-box">
+            <h4>Internal Fragmentation:</h4>
+            <p><span id="internalFragmentation">0</span> KB</p>
+            <p>Wasted space in the last page of each process.</p>
+          </div>
+        </div>
+        <div id="segmentationInfo">
+          <div class="info-box">
+            <h4>External Fragmentation:</h4>
+            <p><span id="externalFragmentation">0</span> KB</p>
+            <p>Free memory scattered in small blocks.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Allocated Processes</h2>
+      <div id="allocatedProcesses"></div>
+    </div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
