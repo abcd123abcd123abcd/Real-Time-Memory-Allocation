@@ -6,6 +6,7 @@ let pageSizeBlocks = [];
 let allocatedProcesses = {};
 let memoryMode = "segmentation"; // Default mode
 let pageTable = {}; // For paging mode
+let allocationHistory = [];
 
 $(document).ready(function() {
   try {
@@ -283,11 +284,21 @@ function allocateMemoryPaging(processes) {
 }
 
 function allocateMemory(processes, strategy) {
+  let result;
   if (memoryMode === 'paging') {
-    return allocateMemoryPaging(processes);
+    result = allocateMemoryPaging(processes);
   } else {
-    return allocateMemorySegmentation(processes, strategy);
+    result = allocateMemorySegmentation(processes, strategy);
   }
+
+  if (result.success) {
+    processes.forEach(proc => {
+      allocationHistory.push(`Allocated Process "${proc.name}" (${proc.size} KB) using ${memoryMode} mode.`);
+    });
+    updateAllocationHistory(); // Update the history section
+  }
+
+  return result;
 }
 
 function allocateMemorySegmentation(processes, strategy) {
@@ -474,17 +485,20 @@ function updateProcessTable() {
 
 function deallocateProcess(processId) {
   if (allocatedProcesses[processId]) {
+    const process = allocatedProcesses[processId];
+    allocationHistory.push(`Deallocated Process "${process.name}" (${process.size} KB).`);
+    delete allocatedProcesses[processId];
+
     for (let i = 0; i < pageSizeBlocks.length; i++) {
       if (pageSizeBlocks[i] === processId) {
         pageSizeBlocks[i] = null;
       }
     }
-    
-    delete allocatedProcesses[processId];
-    
+
     updateChart();
     updateProcessTable();
     updateMemoryStats();
+    updateAllocationHistory(); // Update the history section
   }
 }
 
@@ -904,4 +918,20 @@ function createDiagrams() {
             .innerHTML = segmentationSVG;
   document.querySelector('#compareVisualization .comparison-column:last-child .comparison-image')
             .innerHTML = pagingSVG;
+}
+
+function updateAllocationHistory() {
+  const historyContainer = $('#allocationHistory');
+  historyContainer.empty();
+
+  allocationHistory.forEach(entry => {
+    const historyItem = $('<div>').addClass('history-item').text(entry);
+    historyContainer.append(historyItem);
+  });
+}
+
+function resetSimulation() {
+  allocationHistory = [];
+  updateAllocationHistory(); // Clear the history section
+  // Other reset logic...
 }
